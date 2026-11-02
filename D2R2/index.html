@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>D2R2 · Regulation-guided perturbation prediction</title>
-  <meta name="description" content="D2R2: Discrete Diffusion with Regulation Reinforcement for Single-Cell Perturbation Prediction. Gene-wise progressive generation with a regulation-guided, RL-refined generation order.">
+  <meta name="description" content="D2R2: Discrete Diffusion with Regulation Reinforcement for Single-Cell Perturbation Prediction. Perturbation prediction as regulation-guided gene-wise progressive generation.">
   <meta property="og:title" content="D²R²: Discrete Diffusion with Regulation Reinforcement for Single-Cell Perturbation Prediction">
-  <meta property="og:description" content="A masked discrete diffusion model generates expression gene by gene, while a regulatory policy decides which genes to reveal next.">
+  <meta property="og:description" content="A masked discrete diffusion model reconstructs a fully masked expression profile step by step, while a regulatory policy decides which genes to resolve at each step.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://impacreat.github.io/D2R2/assets/img/framework.webp">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b1d21'/%3E%3Crect x='6' y='18' width='5' height='8' rx='1.5' fill='%236496cb'/%3E%3Crect x='13.5' y='12' width='5' height='14' rx='1.5' fill='%23e8791a'/%3E%3Crect x='21' y='7' width='5' height='19' rx='1.5' fill='%238a5bb3'/%3E%3C/svg%3E">
@@ -58,8 +58,8 @@
   </nav>
 
   <p class="tldr">
-    <strong>Perturbation prediction, one gene at a time.</strong>
-    A masked discrete diffusion model generates expression gene by gene, while a regulatory policy, initialized from a gene regulatory network and refined with reinforcement learning, decides which genes to reveal next.
+    <strong>Perturbation prediction as regulation-guided, gene-wise progressive generation.</strong>
+    A masked discrete diffusion model reconstructs a fully masked expression profile step by step, so already-generated genes condition those still masked. A regulatory policy, initialized from a gene regulatory network inferred from control cells and refined with GRPO, decides which genes to resolve at each step.
   </p>
 </header>
 
@@ -89,7 +89,7 @@
       </div>
     </div>
 
-    <div class="demo-grid" id="demo-grid" role="img" aria-label="Animation of gene-wise generation: at each step the regulatory policy scores masked genes, selects the top ones, and the diffusion model fills their expression tokens."></div>
+    <div class="demo-grid" id="demo-grid" role="img" aria-label="Animation of gene-wise progressive generation: at each step the regulatory policy scores the masked genes, the top-ranked ones are selected, and their predicted expression tokens are committed."></div>
 
     <div class="demo-progress" aria-hidden="true"><div id="demo-progress"></div></div>
     <p class="demo-caption" id="demo-caption" aria-live="polite"></p>
@@ -98,10 +98,10 @@
       <span class="item"><span class="sw mask"></span>Masked gene</span>
       <span class="item"><span class="ramp"><span class="sw" style="background:var(--bin-0)"></span><span class="sw" style="background:var(--bin-1)"></span><span class="sw" style="background:var(--bin-2)"></span><span class="sw" style="background:var(--bin-3)"></span><span class="sw" style="background:var(--bin-4)"></span></span>Expression token (low → high bin)</span>
       <span class="item"><span class="sw bar"></span>Selected by RPM this step</span>
-      <span class="item"><span class="sw dot"></span>Regulatory gene (from the GRN prior)</span>
+      <span class="item"><span class="sw dot"></span>Regulatory gene (has an outgoing edge in the GRN)</span>
     </div>
   </div>
-  <p class="demo-note" id="demo-note">Schematic illustration with 16 genes, 6 steps and 5 bins. The model resolves 1,000 genes over 20 steps (50 per step) with 50 expression bins.</p>
+  <p class="demo-note" id="demo-note">Schematic illustration with 16 genes, 6 steps and 5 bins. In the paper, D<sup>2</sup>R<sup>2</sup> generates 1,000 genes in 20 steps of 50 genes each, with 50 expression bins.</p>
 </section>
 
 <div class="wrap"><hr class="section-rule"></div>
@@ -110,15 +110,15 @@
 <section id="framework" class="wrap">
   <h2>Framework</h2>
   <p class="lead">
-    Existing perturbation models predict the whole expression profile at once, or denoise all genes together, so the order in which gene responses are generated is never modeled.
-    <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> makes that order explicit: already-generated genes become context for the ones still masked, and a learned policy decides what to generate next.
+    Existing approaches mostly generate at the level of the whole expression profile: single-pass models output it at once, and diffusion models iteratively denoise the entire profile. In both cases the gene-wise generation order remains unmodeled.
+    <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> makes that order explicit: already-generated genes become context for the ones still masked, and a learned policy decides which genes to generate next.
   </p>
 
   <figure class="figure">
     <div class="fw-svg" id="fw-svg" data-src="assets/img/framework.svg">
       <img src="assets/img/framework.svg" width="391" height="234" alt="D2R2 framework: the regulatory policy selects genes, MDDM predicts their expression tokens, and the loop repeats until all genes are predicted. The policy is initialized from a biological prior and optimized with GRPO.">
     </div>
-    <figcaption><b>Overview.</b> Left: the generation loop. After MDDM fills the selected tokens, RPM observes the updated partial state and recomputes which genes to resolve next. Upper right: the biological prior used to initialize the policy. Lower right: GRPO refines the order for each perturbation.</figcaption>
+    <figcaption><b>Overview.</b> Left: the iterative generation loop. After MDDM predicts the selected expression tokens, RPM observes the updated partial state and recomputes which genes should be resolved next. Upper right: the biological prior used to initialize the policy. Lower right: GRPO, which optimizes the order for each perturbation.</figcaption>
   </figure>
 
   <p class="fw-hint">Click a component to highlight it in the figure; click it again to show everything.</p>
@@ -126,15 +126,15 @@
     <article class="pillar mddm" role="button" tabindex="0" aria-pressed="false" aria-controls="fw-svg" data-focus="gen">
       <span class="tag">Generator</span>
       <h4>Masked Discrete Diffusion Model</h4>
-      <p>Expression values are binned into ordinal tokens. A non-causal Transformer, conditioned on the control profile, the perturbation and covariates, starts from a fully masked profile and fills genes step by step. Filled tokens stay fixed and condition the rest.</p>
+      <p>Each expression value is mapped to an ordinal token by equal-frequency binning. A non-causal Transformer, conditioned on the control profile, the perturbation and covariates, is trained to reconstruct randomly masked tokens. At inference it starts from a fully masked profile; at each step the tokens of the selected genes are committed, stay fixed, and condition the genes still masked.</p>
     </article>
     <article class="pillar rpm" role="button" tabindex="0" aria-pressed="false" aria-controls="fw-svg" data-focus="rpm">
       <span class="tag">Ordering policy</span>
       <h4>Regulatory Policy Module</h4>
-      <p>At every step RPM scores the still-masked genes from the partial profile, the perturbation and covariates, and picks the ones MDDM resolves next.</p>
+      <p>At every step RPM assigns an unmasking priority to each still-masked gene from the partial profile, the perturbation and covariates. The top-ranked genes are resolved next.</p>
       <ul class="stages">
-        <li><span class="dot prior"></span><span><b>Initialize</b> from a biological prior: a GRN inferred from control cells with DeepSEM, ranked by PageRank so upstream regulators come first.</span></li>
-        <li><span class="dot grpo"></span><span><b>Refine</b> with GRPO while MDDM stays frozen. The reward is perturbation-effect agreement corr(<i>ŷ</i> − <i>c</i>, <i>y</i> − <i>c</i>), which turns the static prior into a state- and perturbation-specific order.</span></li>
+        <li><span class="dot prior"></span><span><b>Initialize</b> from a biological prior: a cell-type-specific GRN inferred from unperturbed control cells with DeepSEM, ranked by PageRank so influential upstream regulators come first.</span></li>
+        <li><span class="dot grpo"></span><span><b>Refine</b> with GRPO while MDDM and the prior stay frozen. The reward is perturbation-effect agreement corr(<i>ŷ</i> − <i>c</i>, <i>y</i> − <i>c</i>), which turns the static prior into a state- and perturbation-specific order.</span></li>
       </ul>
     </article>
   </div>
@@ -144,7 +144,7 @@
     <div class="more-body">
       <figure class="figure">
         <img src="assets/img/paradigm.svg" width="516" height="693" alt="Comparison of single-pass prediction, DDPM global denoising, MDDM random unmasking, and D2R2 regulation-guided unmasking." loading="lazy" class="narrow">
-        <figcaption><b>Paradigm comparison.</b> Single-pass prediction outputs the whole profile at once; DDPM denoises all genes together. MDDM generates gene by gene but in random order, and <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> guides the order with regulatory structure.</figcaption>
+        <figcaption><b>Paradigm comparison.</b> Traditional single-pass prediction, DDPM-based global denoising, and two forms of <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span>: random unmasking (MDDM) and regulation-guided unmasking.</figcaption>
       </figure>
     </div>
   </details>
@@ -156,7 +156,7 @@
 <section id="results" class="wrap">
   <h2>Results</h2>
   <p class="lead">
-    On Norman19 (K562, held-out combinations) <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> is best on all five metrics. On VCC-H1 (H1 hESC, held-out cells) it leads all three differential-expression metrics and stays competitive on absolute expression.
+    <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> ranks first on all five metrics on Norman19 (K562, held-out combinations). On VCC-H1 (H1 hESC, held-out cells) it leads all three differential-expression metrics and remains competitive on absolute expression.
   </p>
 
   <h3>Main results</h3>
@@ -167,11 +167,11 @@
   <div class="table-scroll">
     <table class="results" id="main-table" role="tabpanel"></table>
   </div>
-  <p class="table-note">Mean ± std over five runs (seeds 0, 1, 2, 3, 42). <b>Bold</b>: best, <u>underline</u>: second best. ↑ higher is better, ↓ lower is better.</p>
+  <p class="table-note">Mean ± std over five independent training runs (seeds 0, 1, 2, 3, 42). For <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span>, the MDDM checkpoint is fixed and RPM is trained independently for each seed. <b>Bold</b>: best, <u>underline</u>: second best. ↑ higher is better, ↓ lower is better.</p>
 
   <h3>Generation order matters</h3>
   <p class="lead">
-    Same frozen MDDM, same generation budget; only the order changes. Uncertainty heuristics trade one metric for another. The biological prior improves on random order, reversing it hurts every metric, and RPM adapts the prior to each perturbation.
+    Every order uses the same frozen MDDM and the same 20-step generation budget; only the genes selected at each step change. Uncertainty-based orders improve some metrics at a substantial cost on others. The biological prior improves most metrics over random order, while reversing it drops every metric below random. Initialized from the prior, RPM improves all three perturbation-effect metrics over the fixed prior, with modest trade-offs in centroid- and population-level agreement.
   </p>
   <div class="tabs" role="tablist" aria-label="Metric" id="metric-tabs"></div>
   <div class="chart-card">
@@ -182,7 +182,7 @@
     </div>
     <div id="ablation-chart"></div>
     <div class="tooltip" id="tooltip" role="presentation"></div>
-    <p class="chart-sub">Relative change vs. Random order on Norman19. Positive is always better; for ↓ metrics it is the relative error reduction.</p>
+    <p class="chart-sub">Relative change vs. Random (averaged over multiple random orders) on Norman19. Positive is always better; for ↓ metrics it is the relative error reduction.</p>
   </div>
   <details class="table-view">
     <summary>Show as table</summary>
@@ -193,11 +193,11 @@
 
   <h3>What the learned order captures</h3>
   <p class="lead">
-    RPM resolves regulatory genes first, moves perturbation-specific transcription factors earlier, and the genes it promotes capture most perturbation-specific DE genes.
+    RPM keeps regulatory genes early in generation, moves perturbation-specific transcription factors earlier than the prior does, and the genes it promotes capture most perturbation-specific DE genes.
   </p>
   <figure class="figure">
     <img class="narrow" src="assets/img/bio_analysis.svg" width="590" height="441" alt="Biological analysis: regulatory genes dominate early generation steps; perturbation-specific TFs have higher Delta Order; RPM-promoted genes capture most DE genes." loading="lazy">
-    <figcaption><b>(a)</b> Share of regulatory vs. regulated genes at each generation step under the RPM order. <b>(b)</b> ΔOrder (prior rank − RPM rank; positive = generated earlier) for perturbation-specific vs. non-specific TFs, Mann-Whitney <i>P</i> = 1.6 × 10<sup>−15</sup>. <b>(c)</b> Fraction of DE genes captured by RPM-promoted vs. unpromoted genes, one dot per perturbation, paired Wilcoxon <i>P</i> = 1.7 × 10<sup>−9</sup>.</figcaption>
+    <figcaption><b>(a)</b> Proportions of regulatory and regulated genes across generation steps under the RPM-refined order. <b>(b)</b> ΔOrder (prior rank − RPM rank; positive = generated earlier by RPM) for perturbation-specific vs. non-specific TFs, Mann-Whitney <i>U</i> test, <i>P</i> = 1.6 × 10<sup>−15</sup>. <b>(c)</b> Fraction of DE genes that are RPM-promoted vs. unpromoted, one dot per perturbation, paired Wilcoxon test, <i>P</i> = 1.7 × 10<sup>−9</sup>.</figcaption>
   </figure>
 </section>
 
@@ -221,7 +221,7 @@
 </section>
 
 <footer class="wrap">
-  © 2026 The authors · Zhejiang University
+  © 2026 The authors
 </footer>
 
 <script src="assets/js/demo.js" defer></script>

@@ -113,17 +113,17 @@
   function captionFor(phase, k, step) {
     const n = data.genes.length;
     const tag = (txt) => `<span class="k">${txt}</span>`;
-    if (phase === "start") return `${tag("Start")}All ${n} genes are masked. The model only sees the control profile <i>c</i> and the perturbation <i>p</i>.`;
-    if (phase === "end") return `${tag("Done")}Every gene is resolved. Tokens are decoded to their bin values, giving the predicted perturbed profile.`;
+    if (phase === "start") return `${tag("Start")}All ${n} genes are masked. The model is conditioned on the control profile <i>c</i>, the perturbation <i>p</i> and covariates <i>z</i>.`;
+    if (phase === "end") return `${tag("Done")}All genes are resolved. Each token is decoded to its bin's representative value, giving the predicted perturbed profile.`;
     const b = step.selected.length;
     const regs = step.selected.filter((i) => data.genes[i].regulator).length;
     const s = tag(`Step ${k + 1}`);
-    if (phase === "score") return `${s}RPM scores every still-masked gene given the current partial profile and the perturbation.`;
+    if (phase === "score") return `${s}RPM computes an unmasking priority for every still-masked gene from the partial profile, the perturbation and covariates.`;
     if (phase === "select") {
-      const what = regs === b ? "all regulatory genes" : regs > 0 ? `${regs} of them regulatory` : "responsive genes downstream";
-      return `${s}It selects the top ${b} genes: ${what}.`;
+      const what = regs === b ? "all regulatory genes" : regs > 0 ? `${regs} regulatory, ${b - regs} regulated` : "all regulated genes";
+      return `${s}The top ${b} genes are selected: ${what}.`;
     }
-    return `${s}MDDM predicts their expression tokens. They stay fixed and become context for the next step.`;
+    return `${s}Their tokens, sampled by MDDM, are committed. They stay fixed and condition the genes still masked.`;
   }
 
   // ---- playback ----
