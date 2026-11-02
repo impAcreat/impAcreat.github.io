@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>D2R2 · Regulation-guided perturbation prediction</title>
+  <meta name="description" content="D2R2: Discrete Diffusion with Regulation Reinforcement for Single-Cell Perturbation Prediction. Gene-wise progressive generation with a regulation-guided, RL-refined generation order.">
+  <meta property="og:title" content="D²R²: Discrete Diffusion with Regulation Reinforcement for Single-Cell Perturbation Prediction">
+  <meta property="og:description" content="A masked discrete diffusion model generates expression gene by gene, while a regulatory policy decides which genes to reveal next.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://impacreat.github.io/D2R2/assets/img/framework.webp">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b1d21'/%3E%3Crect x='6' y='18' width='5' height='8' rx='1.5' fill='%236496cb'/%3E%3Crect x='13.5' y='12' width='5' height='14' rx='1.5' fill='%23e8791a'/%3E%3Crect x='21' y='7' width='5' height='19' rx='1.5' fill='%238a5bb3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="hero wrap">
+  <h1><span class="d2r2">D<sup>2</sup>R<sup>2</sup></span></h1>
+  <p class="subtitle">Discrete Diffusion with Regulation Reinforcement for <span class="nw">Single-Cell</span> Perturbation Prediction</p>
+
+  <p class="authors">
+    <span>Ninghan Fan<sup>1*</sup></span>
+    <span>Qi Liu<sup>1*</sup></span>
+    <span>Xunuo Zhu<sup>1*</sup></span>
+    <span>Yukai Sun<sup>1*</sup></span>
+    <span>Luyuan Chen<sup>1</sup></span>
+    <span>Xuheng Zhou<sup>1</sup></span>
+    <span>Yuetian Du<sup>1</sup></span>
+    <span>Ming Kong<sup>1</sup></span>
+    <span>Xiaojun Zhu<sup>1</sup></span>
+    <span>Jie Liu<sup>2†</sup></span>
+    <span>Zhan Zhou<sup>1†</sup></span>
+    <span>Qiang Zhu<sup>1†</sup></span>
+  </p>
+  <p class="affils">
+    <span><sup>1</sup>Zhejiang University</span>
+    <span><sup>2</sup>City University of Hong Kong</span>
+  </p>
+  <p class="notes">* Equal contribution &nbsp;·&nbsp; † Corresponding author</p>
+
+  <nav class="links" aria-label="Paper links">
+    <a class="btn" href="https://arxiv.org/abs/2608.15288">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13M6.5 8.5h4M6.5 11h4"/></svg>
+      arXiv
+    </a>
+    <a class="btn" href="https://arxiv.org/pdf/2608.15288">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 2v8.5M4.5 7.5 8 11l3.5-3.5M3 14h10"/></svg>
+      PDF
+    </a>
+    <span class="btn is-disabled" aria-disabled="true" title="Code will be released soon">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5.5 4 1.5 8l4 4M10.5 4l4 4-4 4"/></svg>
+      Code <span class="soon">· coming soon</span>
+    </span>
+    <a class="btn" href="#bibtex">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 3.5h10M3 8h10M3 12.5h6"/></svg>
+      BibTeX
+    </a>
+  </nav>
+
+  <p class="tldr">
+    <strong>Perturbation prediction, one gene at a time.</strong>
+    A masked discrete diffusion model generates expression gene by gene, while a regulatory policy, initialized from a gene regulatory network and refined with reinforcement learning, decides which genes to reveal next.
+  </p>
+</header>
+
+<!-- ============ Inference demo ============ -->
+<section id="inference" class="wrap" aria-label="Inference animation">
+  <div class="demo" id="demo" data-src="assets/data/demo_trajectory.json">
+    <div class="demo-head">
+      <div class="demo-title">
+        <b>Regulation-guided generation</b>
+        <span class="chip" id="demo-chip">Illustrative</span>
+      </div>
+      <div class="demo-ctrl">
+        <span class="demo-step" id="demo-step">Step <b>0</b> / 0</span>
+        <button class="icon-btn" id="demo-prev" type="button" aria-label="Previous step">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg>
+        </button>
+        <button class="icon-btn" id="demo-play" type="button" aria-label="Pause">
+          <svg viewBox="0 0 16 16" fill="currentColor" class="i-pause"><rect x="4" y="3" width="2.6" height="10" rx="0.8"/><rect x="9.4" y="3" width="2.6" height="10" rx="0.8"/></svg>
+          <svg viewBox="0 0 16 16" fill="currentColor" class="i-play" hidden><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg>
+        </button>
+        <button class="icon-btn" id="demo-next" type="button" aria-label="Next step">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg>
+        </button>
+        <button class="icon-btn" id="demo-restart" type="button" aria-label="Restart">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 8a5.2 5.2 0 1 0 1.6-3.8"/><path d="M2.5 2.2v3h3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="demo-grid" id="demo-grid" role="img" aria-label="Animation of gene-wise generation: at each step the regulatory policy scores masked genes, selects the top ones, and the diffusion model fills their expression tokens."></div>
+
+    <div class="demo-progress" aria-hidden="true"><div id="demo-progress"></div></div>
+    <p class="demo-caption" id="demo-caption" aria-live="polite"></p>
+
+    <div class="demo-legend">
+      <span class="item"><span class="sw mask"></span>Masked gene</span>
+      <span class="item"><span class="ramp"><span class="sw" style="background:var(--bin-0)"></span><span class="sw" style="background:var(--bin-1)"></span><span class="sw" style="background:var(--bin-2)"></span><span class="sw" style="background:var(--bin-3)"></span><span class="sw" style="background:var(--bin-4)"></span></span>Expression token (low → high bin)</span>
+      <span class="item"><span class="sw bar"></span>Selected by RPM this step</span>
+      <span class="item"><span class="sw dot"></span>Regulatory gene (from the GRN prior)</span>
+    </div>
+  </div>
+  <p class="demo-note" id="demo-note">Schematic illustration with 16 genes, 6 steps and 5 bins. The model resolves 1,000 genes over 20 steps (50 per step) with 50 expression bins.</p>
+</section>
+
+<div class="wrap"><hr class="section-rule"></div>
+
+<!-- ============ Framework ============ -->
+<section id="framework" class="wrap">
+  <h2>Framework</h2>
+  <p class="lead">
+    Existing perturbation models predict the whole expression profile at once, or denoise all genes together, so the order in which gene responses are generated is never modeled.
+    <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> makes that order explicit: already-generated genes become context for the ones still masked, and a learned policy decides what to generate next.
+  </p>
+
+  <figure class="figure">
+    <div class="fw-svg" id="fw-svg" data-src="assets/img/framework.svg">
+      <img src="assets/img/framework.svg" width="391" height="234" alt="D2R2 framework: the regulatory policy selects genes, MDDM predicts their expression tokens, and the loop repeats until all genes are predicted. The policy is initialized from a biological prior and optimized with GRPO.">
+    </div>
+    <figcaption><b>Overview.</b> Left: the generation loop. After MDDM fills the selected tokens, RPM observes the updated partial state and recomputes which genes to resolve next. Upper right: the biological prior used to initialize the policy. Lower right: GRPO refines the order for each perturbation.</figcaption>
+  </figure>
+
+  <p class="fw-hint">Click a component to highlight it in the figure; click it again to show everything.</p>
+  <div class="pillars two">
+    <article class="pillar mddm" role="button" tabindex="0" aria-pressed="false" aria-controls="fw-svg" data-focus="gen">
+      <span class="tag">Generator</span>
+      <h4>Masked Discrete Diffusion Model</h4>
+      <p>Expression values are binned into ordinal tokens. A non-causal Transformer, conditioned on the control profile, the perturbation and covariates, starts from a fully masked profile and fills genes step by step. Filled tokens stay fixed and condition the rest.</p>
+    </article>
+    <article class="pillar rpm" role="button" tabindex="0" aria-pressed="false" aria-controls="fw-svg" data-focus="rpm">
+      <span class="tag">Ordering policy</span>
+      <h4>Regulatory Policy Module</h4>
+      <p>At every step RPM scores the still-masked genes from the partial profile, the perturbation and covariates, and picks the ones MDDM resolves next.</p>
+      <ul class="stages">
+        <li><span class="dot prior"></span><span><b>Initialize</b> from a biological prior: a GRN inferred from control cells with DeepSEM, ranked by PageRank so upstream regulators come first.</span></li>
+        <li><span class="dot grpo"></span><span><b>Refine</b> with GRPO while MDDM stays frozen. The reward is perturbation-effect agreement corr(<i>ŷ</i> − <i>c</i>, <i>y</i> − <i>c</i>), which turns the static prior into a state- and perturbation-specific order.</span></li>
+      </ul>
+    </article>
+  </div>
+
+  <details class="more">
+    <summary>Paradigm comparison <span class="hint">· single-pass vs. DDPM vs. MDDM vs. D<sup>2</sup>R<sup>2</sup></span></summary>
+    <div class="more-body">
+      <figure class="figure">
+        <img src="assets/img/paradigm.svg" width="516" height="693" alt="Comparison of single-pass prediction, DDPM global denoising, MDDM random unmasking, and D2R2 regulation-guided unmasking." loading="lazy" class="narrow">
+        <figcaption><b>Paradigm comparison.</b> Single-pass prediction outputs the whole profile at once; DDPM denoises all genes together. MDDM generates gene by gene but in random order, and <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> guides the order with regulatory structure.</figcaption>
+      </figure>
+    </div>
+  </details>
+</section>
+
+<div class="wrap"><hr class="section-rule"></div>
+
+<!-- ============ Results ============ -->
+<section id="results" class="wrap">
+  <h2>Results</h2>
+  <p class="lead">
+    On Norman19 (K562, held-out combinations) <span class="d2r2">D<sup>2</sup>R<sup>2</sup></span> is best on all five metrics. On VCC-H1 (H1 hESC, held-out cells) it leads all three differential-expression metrics and stays competitive on absolute expression.
+  </p>
+
+  <h3>Main results</h3>
+  <div class="tabs" role="tablist" aria-label="Dataset">
+    <button class="tab" role="tab" type="button" aria-selected="true" aria-controls="main-table" data-ds="norman">Norman19</button>
+    <button class="tab" role="tab" type="button" aria-selected="false" aria-controls="main-table" data-ds="h1">VCC-H1</button>
+  </div>
+  <div class="table-scroll">
+    <table class="results" id="main-table" role="tabpanel"></table>
+  </div>
+  <p class="table-note">Mean ± std over five runs (seeds 0, 1, 2, 3, 42). <b>Bold</b>: best, <u>underline</u>: second best. ↑ higher is better, ↓ lower is better.</p>
+
+  <h3>Generation order matters</h3>
+  <p class="lead">
+    Same frozen MDDM, same generation budget; only the order changes. Uncertainty heuristics trade one metric for another. The biological prior improves on random order, reversing it hurts every metric, and RPM adapts the prior to each perturbation.
+  </p>
+  <div class="tabs" role="tablist" aria-label="Metric" id="metric-tabs"></div>
+  <div class="chart-card">
+    <div class="chart-legend">
+      <span class="item"><span class="sw" style="background:var(--gray-mark)"></span>Model-uncertainty orders</span>
+      <span class="item"><span class="sw" style="background:var(--orange)"></span>Biological-prior orders</span>
+      <span class="item"><span class="sw" style="background:var(--purple)"></span>Adaptive RPM (GRPO)</span>
+    </div>
+    <div id="ablation-chart"></div>
+    <div class="tooltip" id="tooltip" role="presentation"></div>
+    <p class="chart-sub">Relative change vs. Random order on Norman19. Positive is always better; for ↓ metrics it is the relative error reduction.</p>
+  </div>
+  <details class="table-view">
+    <summary>Show as table</summary>
+    <div class="table-scroll">
+      <table class="results compact" id="ablation-table"></table>
+    </div>
+  </details>
+
+  <h3>What the learned order captures</h3>
+  <p class="lead">
+    RPM resolves regulatory genes first, moves perturbation-specific transcription factors earlier, and the genes it promotes capture most perturbation-specific DE genes.
+  </p>
+  <figure class="figure">
+    <img class="narrow" src="assets/img/bio_analysis.svg" width="590" height="441" alt="Biological analysis: regulatory genes dominate early generation steps; perturbation-specific TFs have higher Delta Order; RPM-promoted genes capture most DE genes." loading="lazy">
+    <figcaption><b>(a)</b> Share of regulatory vs. regulated genes at each generation step under the RPM order. <b>(b)</b> ΔOrder (prior rank − RPM rank; positive = generated earlier) for perturbation-specific vs. non-specific TFs, Mann-Whitney <i>P</i> = 1.6 × 10<sup>−15</sup>. <b>(c)</b> Fraction of DE genes captured by RPM-promoted vs. unpromoted genes, one dot per perturbation, paired Wilcoxon <i>P</i> = 1.7 × 10<sup>−9</sup>.</figcaption>
+  </figure>
+</section>
+
+<div class="wrap"><hr class="section-rule"></div>
+
+<!-- ============ BibTeX ============ -->
+<section id="bibtex" class="wrap">
+  <h2>BibTeX</h2>
+  <div class="bib">
+    <button class="copy-btn" type="button" id="copy-bib">Copy</button>
+<pre id="bib-text">@article{fan2026d2r2,
+  title   = {D$^2$R$^2$: Discrete Diffusion with Regulation Reinforcement
+             for Single-Cell Perturbation Prediction},
+  author  = {Fan, Ninghan and Liu, Qi and Zhu, Xunuo and Sun, Yukai and
+             Chen, Luyuan and Zhou, Xuheng and Du, Yuetian and Kong, Ming and
+             Zhu, Xiaojun and Liu, Jie and Zhou, Zhan and Zhu, Qiang},
+  journal = {arXiv preprint arXiv:2608.15288},
+  year    = {2026}
+}</pre>
+  </div>
+</section>
+
+<footer class="wrap">
+  © 2026 The authors · Zhejiang University
+</footer>
+
+<script src="assets/js/demo.js" defer></script>
+<script src="assets/js/framework.js" defer></script>
+<script src="assets/js/results.js" defer></script>
+</body>
+</html>
